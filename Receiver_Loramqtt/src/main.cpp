@@ -42,7 +42,7 @@ void reconnect()
     {
         Serial.begin(115200);
         debug("Attempting MQTT connection...");
-        String clientId = "FCClient-";
+        String clientId = "GClient-";
         clientId += String(random(0xffff), HEX);
         if (client.connect(clientId.c_str()))
         {
@@ -59,7 +59,13 @@ void reconnect()
     }
 }
 
-
+void reconnectLora1() {
+  while (!lora1.begin(433E6)) {
+    debugln("Error initializing LoRa receiver. Retrying...");
+    delay(500); // Wait for 5 seconds before retrying
+  }
+  Serial.println("LoRa receiver initialized successfully.");
+}
 void initializeLora1()
 {
 
@@ -67,17 +73,22 @@ void initializeLora1()
   if (!lora1.begin(433E6))
   {
     Serial.println("Error initializing LoRa receiver.");
-    while (1)
-      ; // Halt the program if initialization fails
+    reconnectLora1(); 
   }
-
   lora1.setSyncWord(0xF1);
-  lora1.setSpreadingFactor(7);     // Adjust SF as needed
+  lora1.setSpreadingFactor(8);     // Adjust SF as needed
   lora1.setSignalBandwidth(125E3); // Adjust bandwidth as needed
   lora1.setCodingRate4(5);         // Adjust coding rate as needed
   Serial.println("LoRa Receiver Initializing Successful!");
 
   // debugln("LoRa transmitters successfully initialized!");
+}
+void reconnectLora2() {
+  while (!lora2.begin(433E6)) {
+    Serial.println("Error initializing LoRa receiver. Retrying...");
+    delay(500); // Wait for 5 seconds before retrying
+  }
+  Serial.println("LoRa receiver initialized successfully.");
 }
 void initializeLora2()
 {
@@ -89,8 +100,7 @@ void initializeLora2()
   if (!lora2.begin(433E6))
   {
     Serial.println("Error initializing LoRa transmitter.");
-    while (1)
-      ; // Halt the program if initialization fails
+    reconnectLora2(); // Halt the program if initialization fails
   }
   else
   {
@@ -103,7 +113,7 @@ void initializeLora2()
   lora2.setSpreadingFactor(9); // Set a different SF for lora2 (adjust as needed)
   lora2.setSignalBandwidth(250E3); // Set a different bandwidth for lora2 (adjust as needed)
   lora2.setCodingRate4(7);         // Set a different coding rate for lora2 (adjust as needed)
-
+  lora2.setTxPower(18);
   // debugln("LoRa transmitters successfully initialized!");
 }
 void onReceive(int packetSize)
@@ -154,7 +164,7 @@ void setup()
    // Connect to Wi-Fi
   WiFi.begin(SSID, PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
+    delay(100);
     Serial.println("Connecting to WiFi...");
   }
   Serial.println("Connected to WiFi");
@@ -162,6 +172,9 @@ void setup()
   // Configure the MQTT broker
   client.setServer(MQTT_SERVER, MQTT_PORT);
   client.setCallback(mqttCallback);
+  if(!client.connected()){
+    reconnect();
+  } 
 }
 
 void loop()
@@ -196,9 +209,8 @@ void loop()
   message[bytesRead]= '\0';
 
   client.publish(topic,message);
-  delay(500);
-  // // }
   delay(100);
+  // // }
   initializeLora2();
   digitalWrite(HSPI_SS, LOW);
   if (digitalRead(HSPI_SS) == LOW)
@@ -206,15 +218,15 @@ void loop()
 
     debugln("lora2");
 
-    const char *telemetry_data = "1234"; // Define and initialize telemetry_data
-    byte telemetryBytes[strlen(telemetry_data)];
-    strcpy((char *)telemetryBytes, telemetry_data);
-    int telemetryLength = strlen(telemetry_data);
-    lora2.beginPacket();
-    lora2.write(destination);
-    lora2.write(telemetryBytes, telemetryLength);
-    lora2.endPacket();
-    Serial.println("Acknowledgment sent");
+    // const char *telemetry_data = "1234"; // Define and initialize telemetry_data
+    // byte telemetryBytes[strlen(telemetry_data)];
+    // strcpy((char *)telemetryBytes, telemetry_data);
+    // int telemetryLength = strlen(telemetry_data);
+    // lora2.beginPacket();
+    // lora2.write(destination);
+    // lora2.write(telemetryBytes, telemetryLength);
+    // lora2.endPacket();
+    // Serial.println("Acknowledgment sent");
     
     Button_State = digitalRead(Push_Button); 
     Serial.println(Button_State);

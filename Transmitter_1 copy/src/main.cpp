@@ -7,6 +7,7 @@
 #include <LoRa.h>
 #include "state_machine.h"
 #include "defs.h"
+#include "kalman.h"
 
 SPIClass vspi; // Define VSPI object
 SPIClass hspi; // Define HSPI object
@@ -82,20 +83,7 @@ void initialize_altimeter()
 
   debugln("[+]Altimeter initialized");
 }
-struct TaskFlags
-{
-  bool readAltimeterTask;
-  bool readGyroscopeTask;
-  bool readGPSTask;
-  bool displayDataTask;
-  bool transmitTelemetryTask;
-};
-TaskFlags taskFlags = {
-    true, // Enable or disable tasks as needed
-    true,
-    true,
-    true,
-    true};
+
 struct Acceleration_Data
 {
   double ax;
@@ -130,18 +118,23 @@ struct Telemetry_Data
   float gx;
   float gy;
   float gz;
-  int32_t pressure;
+  float pressure;
   float altitude;
   float velocity;
   float AGL; /* altitude above ground level */
   double latitude;
   double longitude;
-  ;
   uint time;
 };
 
 // initializing lora modules
-
+void reconnectLora1() {
+  while (!lora1.begin(433E6)) {
+    Serial.println("Error initializing LoRa receiver. Retrying...");
+    delay(500); // Wait for 5 seconds before retrying
+  }
+  Serial.println("LoRa receiver initialized successfully.");
+}
 void initializeLora1()
 {
   // hspi = SPIClass(HSPI);
@@ -159,61 +152,33 @@ void initializeLora1()
   if (!lora1.begin(433E6))
   {
     Serial.println("Error initializing LoRa transmitter.");
-    while (1)
-      ; // Halt the program if initialization fails
+    reconnectLora1();
+       // Halt the program if initialization fails
   }
-  // if (!lora2.begin(433E6))
-  // {
-  //     Serial.println("Error initializing LoRa receiver.");
-  //     while (1); // Halt the program if initialization fails
-  // }
-
-  // Set a common sync word for communication between the modules
+  lora1.setTxPower(18);
   lora1.setFrequency(433E6); // Set a specific frequency for lora1 (e.g., 433 MHz)
-  // lora2.setFrequency(433E6);  // Set a different frequency for lora2 (within the same band)
-
   lora1.setSyncWord(0xF1); // Set a unique sync word for lora1
-  // lora2.setSyncWord(0xF2);  // Set a different sync word for lora2
-
-  lora1.setSpreadingFactor(7); // Set SF for lora1 (adjust as needed)
-  // lora2.setSpreadingFactor(9);  // Set a different SF for lora2 (adjust as needed)
-
+  lora1.setSpreadingFactor(8); // Set SF for lora1 (adjust as needed)
   lora1.setSignalBandwidth(125E3); // Set bandwidth for lora1 (adjust as needed)
-  // lora2.setSignalBandwidth(250E3);  // Set a different bandwidth for lora2 (adjust as needed)
   lora1.setCodingRate4(5); // Set coding rate for lora1 (adjust as needed)
-  // lora2.setCodingRate4(7);  // Set a different coding rate for lora2 (adjust as needed)
-
-  // lora1.setSpreadingFactor(7);     // Adjust SF as needed
-  // lora1.setSignalBandwidth(125E3); // Adjust bandwidth as needed
-  // lora1.setCodingRate4(5);         // Adjust coding rate as needed
-
+  lora1.enableCrc(); // 
   // debugln("LoRa transmitters successfully initialized!");
+}
+void reconnectLora2() {
+  while (!lora2.begin(433E6)) {
+    Serial.println("Error initializing LoRa receiver. Retrying...");
+    delay(500); // Wait for 5 seconds before retrying
+  }
+  Serial.println("LoRa receiver initialized successfully.");
 }
 void initializeLora2()
 {
-  // hspi = SPIClass(HSPI);
-  // hspi.begin(HSPI_SCLK, HSPI_MISO, HSPI_MOSI, HSPI_SS);
-  // lora1.setPins(HSPI_SS,HSPI_RST,HSPI_DI0);
-  // lora1.setSPIFrequency(10000000);
-  // lora1.setSPI(hspi);
-
-  // vspi = SPIClass(VSPI);
-  // vspi.begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI, VSPI_SS);
   lora2.setPins(HSPI_SS, HSPI_RST, HSPI_DI0);
-  // lora2.setSPI(vspi);
   lora2.setSPIFrequency(10000000);
-
-  // if (!lora1.begin(433E6))
-  // {
-  //   Serial.println("Error initializing LoRa transmitter.");
-  //   while (1)
-  //     ; // Halt the program if initialization fails
-  // }
   if (!lora2.begin(433E6))
   {
     Serial.println("Error initializing LoRa receiver.");
-    while (1)
-      ; // Halt the program if initialization fails
+    reconnectLora2();
   }
   else
   {
@@ -221,25 +186,12 @@ void initializeLora2()
   }
 
   // Set a common sync word for communication between the modules
-  lora1.setFrequency(433E6); // Set a specific frequency for lora1 (e.g., 433 MHz)
   lora2.setFrequency(433E6); // Set a different frequency for lora2 (within the same band)
-
-  // lora1.setSyncWord(0xF1);  // Set a unique sync word for lora1
   lora2.setSyncWord(0xF4); // Set a different sync word for lora2
-
-  lora1.setSpreadingFactor(7); // Set SF for lora1 (adjust as needed)
   lora2.setSpreadingFactor(9); // Set a different SF for lora2 (adjust as needed)
-
-  lora1.setSignalBandwidth(125E3); // Set bandwidth for lora1 (adjust as needed)
   lora2.setSignalBandwidth(250E3); // Set a different bandwidth for lora2 (adjust as needed)
-  lora1.setCodingRate4(5);         // Set coding rate for lora1 (adjust as needed)
   lora2.setCodingRate4(7);         // Set a different coding rate for lora2 (adjust as needed)
-
-  // lora1.setSpreadingFactor(7);     // Adjust SF as needed
-  // lora1.setSignalBandwidth(125E3); // Adjust bandwidth as needed
-  // lora1.setCodingRate4(5);         // Adjust coding rate as needed
-
-  // debugln("LoRa transmitters successfully initialized!");
+  
 }
 struct Altimeter_Data altimeter_data;
 void readAltimeter()
@@ -405,9 +357,9 @@ void transmitTelemetry()
   float longitude = gps_data.longitude;
   unsigned long time = gps_data.time;
 
-  char telemetry_data[180];
+  char telemetry_data[150];
   sprintf(telemetry_data,
-          "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%i,%.16f,%.16f,%i\n",
+          "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%i,%.8f,%.8f,%i\n",
 
           ax,        // 1
           ay,        // 2
@@ -425,6 +377,18 @@ void transmitTelemetry()
 
   );
 
+  Filtered_Data result = filterData(gyro_data.ax,altimeter_data.altitude,altimeter_data.velocity);
+  char formattedData[30];
+ sprintf(formattedData, " %.2f, %.2f, %.2f",
+  result.filtered_altitude, 
+  result.filtered_velocity, 
+  result.filtered_acceleration
+  );
+  // filtered_data transmit 
+  byte filteredBytes[strlen(formattedData)];
+  strcpy((char *)filteredBytes, formattedData);
+  int filteredLength = strlen(formattedData);
+  
   // telemetry_data from character array to byte array
   byte telemetryBytes[strlen(telemetry_data)];
   strcpy((char *)telemetryBytes, telemetry_data);
@@ -432,9 +396,12 @@ void transmitTelemetry()
   lora1.beginPacket();
   lora1.write(destination);
   lora1.write(telemetryBytes, telemetryLength);
+  lora1.write(filteredBytes, filteredLength);
   // return lora1.endPacket();
   lora1.endPacket();
   debug(telemetry_data);
+  debugln(formattedData);
+
 }
 void setup()
 {
@@ -444,18 +411,13 @@ void setup()
   SPI.begin();
   // initializeLora();
   /* Setup GPS */
-  // pinMode(led, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
   hard.begin(9600, SERIAL_8N1, RX, TX);
   // SPI.setDataMode(SPI_MODE0);
   pinMode(HSPI_SS, OUTPUT);
   pinMode(VSPI_SS, OUTPUT);
   pinMode(VSPI_MISO, INPUT);
-  // digitalWrite(HSPI_SS, LOW);
-  // digitalWrite(VSPI_SS, LOW);
-  // // digitalWrite(NSS,HIGH);
-  // digitalWrite(NSS1,HIGH);
-  // connectToWifi();
-
+ 
   /* Initialize sensors */
   initialize_gyroscope();
   initialize_altimeter();
@@ -503,7 +465,10 @@ void loop()
 
   if (packetSize == 0)
     return; // No data received, exit
-
+  else{
+    digitalWrite(LED_PIN, HIGH); // Assuming LED_PIN is the pin connected to the LED
+    Serial.println("LED turned on");
+  }
   while (lora2.available())
   {
     receivedData[bytesRead] = lora2.read();

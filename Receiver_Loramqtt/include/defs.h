@@ -45,16 +45,11 @@
 #define MQTT_SERVER "192.168.0.104"
 #define MQTT_PORT 1883
 
-/* WIFI credentials */
-// const char* SSID = "Keeps buffering";
-// const char* PASSWORD = "123456780";
-
 // /* WIFI credentials */
-// const char* SSID = "Huawei";
-// const char* PASSWORD = "123456788";
+// const char* SSID = "";
+// const char* PASSWORD = "";
 
-const char* SSID = "Jammed_Signal";
-const char* PASSWORD = "45698712";
+
 
 const char* topic = "sensor_data_topic";
 const int Push_Button = 14;

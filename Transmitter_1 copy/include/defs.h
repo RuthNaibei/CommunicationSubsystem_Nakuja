@@ -50,7 +50,7 @@
 
 /* LEDs for testing - remove on production */
 #define PRE_FLIGHT_LED 4
-int counter = 0;
+// int counter = 0;
 
 
 #endif
@@ -80,4 +80,5 @@ int counter = 0;
 #define HSPI_SS     15
 #define HSPI_RST    32
 #define HSPI_DI0    33
+#define LED_PIN 27
 
